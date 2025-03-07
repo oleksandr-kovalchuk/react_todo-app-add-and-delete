@@ -1,91 +1,160 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { getTodos } from './api/todos';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Todo } from './types/Todo';
-import { Filter } from './types/Filter';
-import Header from './components/Header';
-import TodoList from './components/TodoList';
-import Footer from './components/Footer';
-import ErrorNotification from './components/ErrorNotification';
+import { TypeFilter } from './types/TypeFilter';
+import * as apiService from './api/todos';
+import { TodoHeader } from './components/TodoHeader';
+import { TodoList } from './components/TodoList';
+import { TodoFooter } from './components/TodoFooter';
+import { ErrorNotifications } from './components/ErrorNotifications';
 
 export const App: React.FC = () => {
-  const [todoList, setTodoList] = useState<Todo[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [currentFilter, setCurrentFilter] = useState<Filter>(Filter.All);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const [todos, setTodos] = useState<Todo[]>([]);
+  const [tempTodo, setTempTodo] = useState<Todo | null>(null);
+  const [newTodoInput, setNewTodoInput] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingIds, setLoadingIds] = useState<number[]>([]);
+  const [filterBy, setFilterBy] = useState(TypeFilter.All);
+
+  const filteredTodos = useMemo(() => {
+    switch (filterBy) {
+      case TypeFilter.Active:
+        return todos.filter(todo => !todo.completed);
+      case TypeFilter.Completed:
+        return todos.filter(todo => todo.completed);
+      default:
+        return todos;
+    }
+  }, [todos, filterBy]);
+
+  const notCompletedTasksCounter = useMemo(
+    () => todos.filter(todo => !todo.completed).length,
+    [todos],
+  );
+  const completedTasks = useMemo(
+    () => todos.filter(todo => todo.completed),
+    [todos],
+  );
+  const hasTodos = todos.length > 0;
+
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    setTimeout(() => setErrorMessage(''), 3000);
+  };
 
   useEffect(() => {
-    const loadTodos = async () => {
+    const fetchTodos = async () => {
       try {
-        setLoading(true);
-        setErrorMessage(null);
-        const todos = await getTodos();
+        const todosData = await apiService.getTodos();
 
-        setTodoList(todos);
+        setTodos(todosData);
       } catch {
-        setErrorMessage('Unable to load todos');
-      } finally {
-        setLoading(false);
+        showError('Unable to load todos');
       }
     };
 
-    loadTodos();
+    fetchTodos();
   }, []);
 
-  useEffect(() => {
-    if (!errorMessage) {
+  const addTodo = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const title = newTodoInput.trim();
+
+    if (!title) {
+      showError('Title should not be empty');
+
       return;
     }
 
-    const timer = setTimeout(() => setErrorMessage(null), 3000);
+    setIsLoading(true);
+    const newTodo = {
+      id: 0,
+      title,
+      userId: apiService.USER_ID,
+      completed: false,
+    };
 
-    return () => clearTimeout(timer);
-  }, [errorMessage]);
+    setTempTodo(newTodo);
 
-  const filteredTodos = useMemo(() => {
-    switch (currentFilter) {
-      case Filter.Active:
-        return todoList.filter(todo => !todo.completed);
+    try {
+      const createdTodo = await apiService.createTodo(newTodo);
 
-      case Filter.Completed:
-        return todoList.filter(todo => todo.completed);
-
-      default:
-        return todoList;
+      setTodos(currentTodos => [...currentTodos, createdTodo]);
+      setNewTodoInput('');
+    } catch {
+      showError('Unable to add a todo');
+    } finally {
+      setTempTodo(null);
+      setIsLoading(false);
     }
-  }, [todoList, currentFilter]);
+  };
 
-  const activeTodosCount = useMemo(
-    () => todoList.filter(todo => !todo.completed).length,
-    [todoList],
-  );
+  const handleDeleteTodo = async (todoIds: number[]) => {
+    if (!todoIds.length) {
+      return;
+    }
+
+    setLoadingIds(todoIds);
+
+    const deletionPromises = todoIds.map(async todoId => {
+      try {
+        await apiService.deleteTodo(todoId);
+        setTodos(currentTodos =>
+          currentTodos.filter(todo => todo.id !== todoId),
+        );
+      } catch {
+        showError('Unable to delete a todo');
+      }
+    });
+
+    await Promise.all(deletionPromises);
+    setLoadingIds([]);
+  };
+
+  const clearCompletedTasks = () => {
+    const completedIds = completedTasks.map(todo => todo.id);
+
+    handleDeleteTodo(completedIds);
+  };
 
   return (
     <div className="todoapp">
       <h1 className="todoapp__title">todos</h1>
-
       <div className="todoapp__content">
-        <Header />
+        <TodoHeader
+          todos={todos}
+          newTodoInput={newTodoInput}
+          setNewTodoInput={setNewTodoInput}
+          addTodo={addTodo}
+          isLoading={isLoading}
+          inputRef={inputRef}
+          loadingIds={loadingIds}
+        />
 
-        {loading ? (
-          <div className="notification is-info">Loading...</div>
-        ) : (
-          todoList.length > 0 && (
-            <>
-              <TodoList todos={filteredTodos} />
+        <TodoList
+          todos={filteredTodos}
+          handleDeleteTodo={handleDeleteTodo}
+          tempTodo={tempTodo}
+          isLoading={isLoading}
+          loadingIds={loadingIds}
+        />
 
-              <Footer
-                activeCount={activeTodosCount}
-                currentFilter={currentFilter}
-                setCurrentFilter={setCurrentFilter}
-              />
-            </>
-          )
+        {hasTodos && (
+          <TodoFooter
+            filterBy={filterBy}
+            setFilterBy={setFilterBy}
+            notCompletedTasksCounter={notCompletedTasksCounter}
+            isCompletedExists={completedTasks.length > 0}
+            clearCompletedTasks={clearCompletedTasks}
+          />
         )}
       </div>
 
-      <ErrorNotification
+      <ErrorNotifications
         errorMessage={errorMessage}
-        onHide={() => setErrorMessage(null)}
+        setErrorMessage={setErrorMessage}
       />
     </div>
   );
