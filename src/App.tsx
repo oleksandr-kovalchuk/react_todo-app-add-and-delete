@@ -1,53 +1,57 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { Todo } from './types/Todo';
 import { TypeFilter } from './types/TypeFilter';
-import * as apiService from './api/todos';
+import * as api from './api/todos';
 import { TodoHeader } from './components/TodoHeader';
 import { TodoList } from './components/TodoList';
 import { TodoFooter } from './components/TodoFooter';
 import { ErrorNotifications } from './components/ErrorNotifications';
 
 export const App: React.FC = () => {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
   const [todos, setTodos] = useState<Todo[]>([]);
   const [tempTodo, setTempTodo] = useState<Todo | null>(null);
   const [newTodoInput, setNewTodoInput] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingIds, setLoadingIds] = useState<number[]>([]);
-  const [filterBy, setFilterBy] = useState(TypeFilter.All);
+  const [filter, setFilter] = useState(TypeFilter.All);
 
-  const filteredTodos = useMemo(() => {
-    switch (filterBy) {
-      case TypeFilter.Active:
-        return todos.filter(todo => !todo.completed);
-      case TypeFilter.Completed:
-        return todos.filter(todo => todo.completed);
-      default:
-        return todos;
-    }
-  }, [todos, filterBy]);
+  const newInputRef = useRef<HTMLInputElement | null>(null);
 
-  const notCompletedTasksCounter = useMemo(
-    () => todos.filter(todo => !todo.completed).length,
+  const activeTodos = useMemo(
+    () => todos.filter(todo => !todo.completed),
     [todos],
   );
-  const completedTasks = useMemo(
+
+  const completedTodos = useMemo(
     () => todos.filter(todo => todo.completed),
     [todos],
   );
-  const hasTodos = todos.length > 0;
+
+  const activeCount = activeTodos.length;
 
   const showError = (message: string) => {
-    setErrorMessage(message);
-    setTimeout(() => setErrorMessage(''), 3000);
+    setError(message);
+    setTimeout(() => setError(''), 3000);
   };
+
+  const filteredTodos = useMemo(() => {
+    switch (filter) {
+      case TypeFilter.Active:
+        return activeTodos;
+
+      case TypeFilter.Completed:
+        return completedTodos;
+
+      default:
+        return todos;
+    }
+  }, [todos, filter, activeTodos, completedTodos]);
 
   useEffect(() => {
     const fetchTodos = async () => {
       try {
-        const todosData = await apiService.getTodos();
+        const todosData = await api.getTodos();
 
         setTodos(todosData);
       } catch {
@@ -58,8 +62,9 @@ export const App: React.FC = () => {
     fetchTodos();
   }, []);
 
-  const addTodo = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const addTodo = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
     const title = newTodoInput.trim();
 
     if (!title) {
@@ -69,19 +74,20 @@ export const App: React.FC = () => {
     }
 
     setIsLoading(true);
+
     const newTodo = {
       id: 0,
       title,
-      userId: apiService.USER_ID,
+      userId: api.USER_ID,
       completed: false,
     };
 
     setTempTodo(newTodo);
 
     try {
-      const createdTodo = await apiService.createTodo(newTodo);
+      const createdTodo = await api.createTodo(newTodo);
 
-      setTodos(currentTodos => [...currentTodos, createdTodo]);
+      setTodos(prev => [...prev, createdTodo]);
       setNewTodoInput('');
     } catch {
       showError('Unable to add a todo');
@@ -91,32 +97,31 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleDeleteTodo = async (todoIds: number[]) => {
-    if (!todoIds.length) {
+  const deleteTodos = async (ids: number[]) => {
+    if (!ids.length) {
       return;
     }
 
-    setLoadingIds(todoIds);
+    setLoadingIds(ids);
 
-    const deletionPromises = todoIds.map(async todoId => {
-      try {
-        await apiService.deleteTodo(todoId);
-        setTodos(currentTodos =>
-          currentTodos.filter(todo => todo.id !== todoId),
-        );
-      } catch {
-        showError('Unable to delete a todo');
-      }
-    });
+    await Promise.all(
+      ids.map(async id => {
+        try {
+          await api.deleteTodo(id);
+          setTodos(prev => prev.filter(todo => todo.id !== id));
+        } catch {
+          showError('Unable to delete a todo');
+        }
+      }),
+    );
 
-    await Promise.all(deletionPromises);
     setLoadingIds([]);
   };
 
-  const clearCompletedTasks = () => {
-    const completedIds = completedTasks.map(todo => todo.id);
+  const clearCompletedTodos = () => {
+    const completedIds = completedTodos.map(todo => todo.id);
 
-    handleDeleteTodo(completedIds);
+    deleteTodos(completedIds);
   };
 
   return (
@@ -129,33 +134,30 @@ export const App: React.FC = () => {
           setNewTodoInput={setNewTodoInput}
           addTodo={addTodo}
           isLoading={isLoading}
-          inputRef={inputRef}
+          newInputRef={newInputRef}
           loadingIds={loadingIds}
         />
 
         <TodoList
           todos={filteredTodos}
-          handleDeleteTodo={handleDeleteTodo}
+          deleteTodos={deleteTodos}
           tempTodo={tempTodo}
           isLoading={isLoading}
           loadingIds={loadingIds}
         />
 
-        {hasTodos && (
+        {todos.length > 0 && (
           <TodoFooter
-            filterBy={filterBy}
-            setFilterBy={setFilterBy}
-            notCompletedTasksCounter={notCompletedTasksCounter}
-            isCompletedExists={completedTasks.length > 0}
-            clearCompletedTasks={clearCompletedTasks}
+            filterBy={filter}
+            setFilterBy={setFilter}
+            activeCount={activeCount}
+            hasCompleted={completedTodos.length > 0}
+            clearCompletedTodos={clearCompletedTodos}
           />
         )}
       </div>
 
-      <ErrorNotifications
-        errorMessage={errorMessage}
-        setErrorMessage={setErrorMessage}
-      />
+      <ErrorNotifications errorMessage={error} setErrorMessage={setError} />
     </div>
   );
 };

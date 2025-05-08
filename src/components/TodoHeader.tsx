@@ -8,7 +8,7 @@ type Props = {
   setNewTodoInput: React.Dispatch<React.SetStateAction<string>>;
   addTodo: (event: React.FormEvent<HTMLFormElement>) => void;
   isLoading: boolean;
-  inputRef: React.MutableRefObject<HTMLInputElement | null>;
+  newInputRef: React.MutableRefObject<HTMLInputElement | null>;
   loadingIds: number[];
 };
 
@@ -18,15 +18,15 @@ export const TodoHeader: React.FC<Props> = ({
   setNewTodoInput,
   addTodo,
   isLoading,
-  inputRef,
+  newInputRef,
   loadingIds,
 }) => {
   const hasTodos = todos.length > 0;
   const allTodosCompleted = hasTodos && todos.every(todo => todo.completed);
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, [inputRef, isLoading, loadingIds]);
+    newInputRef.current?.focus();
+  }, [newInputRef, isLoading, loadingIds]);
 
   const handleInputChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,7 +55,7 @@ export const TodoHeader: React.FC<Props> = ({
           placeholder="What needs to be done?"
           value={newTodoInput}
           onChange={handleInputChange}
-          ref={inputRef}
+          ref={newInputRef}
           disabled={isLoading}
         />
       </form>

@@ -6,7 +6,7 @@ import { TodoItem } from './TodoItem';
 type Props = {
   todos: Todo[];
   tempTodo: Todo | null;
-  handleDeleteTodo: (todoIds: number[]) => void;
+  deleteTodos: (todoIds: number[]) => void;
   isLoading: boolean;
   loadingIds: number[];
 };
@@ -14,7 +14,7 @@ type Props = {
 export const TodoList: React.FC<Props> = ({
   todos,
   tempTodo,
-  handleDeleteTodo,
+  deleteTodos,
   isLoading,
   loadingIds,
 }) => {
@@ -22,7 +22,7 @@ export const TodoList: React.FC<Props> = ({
     <CSSTransition key={todo.id} timeout={300} classNames="item">
       <TodoItem
         todo={todo}
-        handleDeleteTodo={handleDeleteTodo}
+        handleDeleteTodo={deleteTodos}
         isLoading={false}
         loadingIds={loadingIds}
       />
@@ -33,11 +33,12 @@ export const TodoList: React.FC<Props> = ({
     <section className="todoapp__main" data-cy="TodoList">
       <TransitionGroup>
         {todoItems}
+
         {tempTodo && (
           <CSSTransition key="temp" timeout={300} classNames="temp-item">
             <TodoItem
               todo={tempTodo}
-              handleDeleteTodo={handleDeleteTodo}
+              handleDeleteTodo={deleteTodos}
               isLoading={isLoading}
               loadingIds={loadingIds}
             />

@@ -5,19 +5,19 @@ import { TypeFilter } from '../types/TypeFilter';
 type Props = {
   filterBy: TypeFilter;
   setFilterBy: React.Dispatch<React.SetStateAction<TypeFilter>>;
-  notCompletedTasksCounter: number;
-  isCompletedExists: boolean;
-  clearCompletedTasks: () => void;
+  activeCount: number;
+  hasCompleted: boolean;
+  clearCompletedTodos: () => void;
 };
 
 export const TodoFooter: React.FC<Props> = ({
   filterBy,
   setFilterBy,
-  notCompletedTasksCounter,
-  isCompletedExists,
-  clearCompletedTasks,
+  activeCount,
+  hasCompleted,
+  clearCompletedTodos,
 }) => {
-  const itemText = notCompletedTasksCounter === 1 ? 'item' : 'items';
+  const itemText = activeCount === 1 ? 'item' : 'items';
 
   const handleFilterClick = useCallback(
     (todoType: TypeFilter) => {
@@ -29,7 +29,7 @@ export const TodoFooter: React.FC<Props> = ({
   return (
     <footer className="todoapp__footer" data-cy="Footer">
       <span className="todo-count" data-cy="TodosCounter">
-        {notCompletedTasksCounter} {itemText} left
+        {activeCount} {itemText} left
       </span>
 
       <nav className="filter" data-cy="Filter">
@@ -55,8 +55,8 @@ export const TodoFooter: React.FC<Props> = ({
         type="button"
         className="todoapp__clear-completed"
         data-cy="ClearCompletedButton"
-        disabled={!isCompletedExists}
-        onClick={clearCompletedTasks}
+        disabled={!hasCompleted}
+        onClick={clearCompletedTodos}
       >
         Clear completed
       </button>

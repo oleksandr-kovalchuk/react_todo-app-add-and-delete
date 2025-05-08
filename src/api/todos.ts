@@ -8,7 +8,7 @@ export const getTodos = () => {
 };
 
 export const createTodo = ({ userId, title, completed }: Omit<Todo, 'id'>) => {
-  return client.post<Todo>(`/todos`, {
+  return client.post<Todo>('/todos', {
     userId,
     title,
     completed,
